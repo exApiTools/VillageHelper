@@ -49,7 +49,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                         ImGui.SameLine();
                         foreach (var requiredResource in nextUpgradeTier.Key.RequiredResources)
                         {
-                            var enoughResource = requiredResource.Item2 >= resources.GetValueOrDefault(requiredResource.Item1);
+                            var enoughResource = requiredResource.Item2 <= resources.GetValueOrDefault(requiredResource.Item1);
                             ImGui.TextColored(enoughResource ? Settings.GoodColor.Value.ToImguiVec4() : Settings.BadColor.Value.ToImguiVec4(),
                                 $"{requiredResource.Item2}x {requiredResource.Item1.Export?.Name ?? requiredResource.Item1.Id},");
                             ImGui.SameLine();
