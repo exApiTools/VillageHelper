@@ -4,6 +4,7 @@ using System.Linq;
 using ExileCore;
 using ExileCore.PoEMemory.Components;
 using ExileCore.Shared.Helpers;
+using ExileCore.Shared.Enums;
 using ImGuiNET;
 using SharpDX;
 
@@ -120,5 +121,23 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 }
             }
         }
+        
+        var position = GameController.LeftPanel.StartDrawPoint;
+        var measury = Graphics.MeasureText($"SHIPMENT 00:00!");
+        var positionLeft = position.Translate(-measury.X, 0);
+
+        if (Settings.ShowShipments &&
+            GameController.IngameState.IngameUi.VillageScreen.RemainingShipmentTimes is { Count: > 0 })
+        {
+	        foreach (var remainingShipmentTime in GameController.IngameState.IngameUi.VillageScreen.RemainingShipmentTimes)
+	        {
+		        var drawText = remainingShipmentTime <= TimeSpan.Zero 
+			        ? Graphics.DrawText("SHIPMENT HERE!", positionLeft, Color.Green, FontAlign.Left) 
+			        : Graphics.DrawText($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Color.Wheat, FontAlign.Left);
+		        position.Y += drawText.Y;
+		        positionLeft.Y += drawText.Y;
+			}
+		}
+		
     }
 }
