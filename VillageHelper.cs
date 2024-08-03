@@ -270,27 +270,31 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
         var rankedRanks = worker.JobRanks.ToList();
         var expectedWage = rankedRanks.Where(x => AverageWorkerWages.ContainsKey(x.Key.Id))
             .ToDictionary(r => r.Key, r => AverageWorkerWages[r.Key.Id] * GameController.Files.VillageJobSkillLevels.GetByLevel(r.Value).Speed);
-        tooltipActions.Add(() =>
+        if (expectedWage.Any())
         {
-            ImGui.Text("Expected wages:");
-            if (ImGui.BeginTable("expected", 2, ImGuiTableFlags.Borders))
+            tooltipActions.Add(() =>
             {
-                var longestSkill = expectedWage.Max(x => x.Key.Id?.Length ?? 0);
-                ImGui.TableSetupColumn("Skill");
-                ImGui.TableSetupColumn("GPH");
-                ImGui.TableHeadersRow();
-                foreach (var skill in expectedWage.OrderByDescending(x => x.Value))
+                ImGui.Text("Expected wages:");
+                if (ImGui.BeginTable("expected", 2, ImGuiTableFlags.Borders))
                 {
-                    ImGui.TableNextRow();
-                    ImGui.TableNextColumn();
-                    ImGui.Text(skill.Key.Id?.PadLeft(longestSkill) ?? "");
-                    ImGui.TableNextColumn();
-                    ImGui.Text(skill.Value.ToString("F0").PadLeft(4));
-                }
+                    var longestSkill = expectedWage.Max(x => x.Key.Id?.Length ?? 0);
+                    ImGui.TableSetupColumn("Skill");
+                    ImGui.TableSetupColumn("GPH");
+                    ImGui.TableHeadersRow();
+                    foreach (var skill in expectedWage.OrderByDescending(x => x.Value))
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        ImGui.Text(skill.Key.Id?.PadLeft(longestSkill) ?? "");
+                        ImGui.TableNextColumn();
+                        ImGui.Text(skill.Value.ToString("F0").PadLeft(4));
+                    }
 
-                ImGui.EndTable();
-            }
-        });
+                    ImGui.EndTable();
+                }
+            });
+        }
+
         if (rankedRanks.All(x => AverageWorkerWages.ContainsKey(x.Key.Id)))
         {
             var maxWageSkill = expectedWage.MaxBy(x => x.Value);
