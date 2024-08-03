@@ -177,6 +177,8 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 Graphics.MeasureText("99999 gold (-99999/hr) 00:00"),
             }.MaxBy(x => x.X);
             var positionLeft = position - shipmentTextSize with { Y = 0 };
+            positionLeft.X += Settings.StatusOverlayXOffset;
+            positionLeft.Y += Settings.StatusOverlayYOffset;
 
             if (Settings.ShowActions)
             {
@@ -185,16 +187,16 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                     foreach (var remainingShipmentTime in villageScreen.RemainingShipmentTimes)
                     {
                         var drawText = remainingShipmentTime <= TimeSpan.Zero
-                            ? Graphics.DrawText("SHIPMENT HERE!", positionLeft, Settings.GoodColor)
-                            : Graphics.DrawText($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor);
+                            ? Graphics.DrawTextWithBackground("SHIPMENT HERE!", positionLeft, Settings.GoodColor, Color.Black)
+                            : Graphics.DrawTextWithBackground($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor,Color.Black);
                         position.Y += drawText.Y;
                         positionLeft.Y += drawText.Y;
                     }
                 }
 
                 var textSize = villageScreen.RemainingDisenchantmentTime <= TimeSpan.Zero
-                    ? Graphics.DrawText("DISENCHANTMENT EMPTY!", positionLeft, Settings.BadColor)
-                    : Graphics.DrawText($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor);
+                    ? Graphics.DrawTextWithBackground("DISENCHANTMENT EMPTY!", positionLeft, Settings.BadColor,Color.Black)
+                    : Graphics.DrawTextWithBackground($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor,Color.Black);
                 position.Y += textSize.Y;
                 positionLeft.Y += textSize.Y;
             }
@@ -202,9 +204,9 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
             if (Settings.ShowResources)
             {
                 var colorSet = villageGold <= 1 && Settings.ShowEmptyResourcesInColor;
-                var textSize = Graphics.DrawText(
+                var textSize = Graphics.DrawTextWithBackground(
                     $"{villageGold} gold (-{villageScreen.TotalWagePerHour}/hr) {TimeSpan.FromHours(villageGold / (float)villageScreen.TotalWagePerHour):hh\\:mm}", positionLeft,
-                    colorSet ? Settings.BadColor : Settings.NeutralColor);
+                    colorSet ? Settings.BadColor : Settings.NeutralColor, Color.Black);
 
                 position.Y += textSize.Y;
                 positionLeft.Y += textSize.Y;
