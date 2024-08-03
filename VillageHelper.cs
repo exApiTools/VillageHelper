@@ -275,7 +275,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
             ImGui.Text("Expected wages:");
             if (ImGui.BeginTable("expected", 2, ImGuiTableFlags.Borders))
             {
-                var longestSkill = expectedWage.Max(x => x.Key.Id.Length);
+                var longestSkill = expectedWage.Max(x => x.Key.Id?.Length ?? 0);
                 ImGui.TableSetupColumn("Skill");
                 ImGui.TableSetupColumn("GPH");
                 ImGui.TableHeadersRow();
@@ -283,7 +283,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 {
                     ImGui.TableNextRow();
                     ImGui.TableNextColumn();
-                    ImGui.Text(skill.Key.Id.PadLeft(longestSkill));
+                    ImGui.Text(skill.Key.Id?.PadLeft(longestSkill) ?? "");
                     ImGui.TableNextColumn();
                     ImGui.Text(skill.Value.ToString("F0").PadLeft(4));
                 }
