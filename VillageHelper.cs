@@ -19,9 +19,10 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
     {
         ["Mining"] = 5.5f,
         ["Smelting"] = 6.5f,
-        ["Farming"] = 12.33f,
+        ["Farming"] = 13.08f,
         ["Disenchanting"] = 20.66f,
-        ["Shipping"] = 7.6f,
+        ["Shipping"] = 7.64f,
+        ["Mapping"] = 35.7f,
     };
 
     public override bool Initialise()
@@ -188,15 +189,15 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                     {
                         var drawText = remainingShipmentTime <= TimeSpan.Zero
                             ? Graphics.DrawTextWithBackground("SHIPMENT HERE!", positionLeft, Settings.GoodColor, Color.Black)
-                            : Graphics.DrawTextWithBackground($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor,Color.Black);
+                            : Graphics.DrawTextWithBackground($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor, Color.Black);
                         position.Y += drawText.Y;
                         positionLeft.Y += drawText.Y;
                     }
                 }
 
                 var textSize = villageScreen.RemainingDisenchantmentTime <= TimeSpan.Zero
-                    ? Graphics.DrawTextWithBackground("DISENCHANTMENT EMPTY!", positionLeft, Settings.BadColor,Color.Black)
-                    : Graphics.DrawTextWithBackground($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor,Color.Black);
+                    ? Graphics.DrawTextWithBackground("DISENCHANTMENT EMPTY!", positionLeft, Settings.BadColor, Color.Black)
+                    : Graphics.DrawTextWithBackground($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor, Color.Black);
                 position.Y += textSize.Y;
                 positionLeft.Y += textSize.Y;
             }
@@ -217,6 +218,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
 
         if (Settings.ShowWorkerUpgradeTips)
         {
+            HashSet<string> workersToReplace = [];
             if (GameController.IngameState.IngameUi.VillageRecruitmentPanel is
                 {
                     IsVisible: true,
@@ -228,13 +230,13 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 foreach (var (workerElement, worker) in offeredWorkers.Where(x => x.IsVisible)
                              .Join(villageScreen.WorkersForSale, x => x.WorkerName, x => x.WorkerName, (el, d) => (el, d)))
                 {
-                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, null);
+                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, null, workersToReplace);
                 }
 
                 foreach (var (workerElement, worker) in currentWorkers.Where(x => x.IsVisible)
                              .Join(villageScreen.Workers, x => x.WorkerName, x => x.WorkerName, (el, d) => (el, d)))
                 {
-                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type);
+                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type, workersToReplace);
                 }
             }
 
@@ -249,20 +251,28 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 foreach (var (workerElement, worker) in availableWorkers.Where(x => x.IsVisible)
                              .Join(villageScreen.Workers, x => x.WorkerName, x => x.WorkerName, (el, d) => (el, d)))
                 {
-                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type);
+                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type, workersToReplace);
                 }
 
                 foreach (var (workerElement, worker) in assignedWorkers.Where(x => x.IsVisible)
                              .Join(villageScreen.Workers, x => x.WorkerName, x => x.WorkerName, (el, d) => (el, d)))
                 {
-                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type);
+                    ShowUpgradeTooltips(existingWorkersByAssignedSkill, worker, workerElement, worker.Job.Type, []);
+                }
+
+                if (workersToReplace.Any())
+                {
+                    foreach (var workerToReplace in assignedWorkers.Where(x => x.IsVisible).IntersectBy(workersToReplace, x => x.WorkerName))
+                    {
+                        Graphics.DrawFrame(workerToReplace.GetClientRectCache, Settings.BadColor, 3);
+                    }
                 }
             }
         }
     }
 
     private void ShowUpgradeTooltips(Dictionary<VillageJobType, List<VillageWorker>> existingWorkersByAssignedSkill, BaseVillageWorker worker, Element workerElement,
-        VillageJobType assignedJob)
+        VillageJobType assignedJob, HashSet<string> workersToReplace)
     {
         List<Action> tooltipActions = [];
         var indicatorType = 0;
@@ -327,17 +337,19 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 var gphPerWorkUnitString = "GPH/work unit";
                 if (upgradeList.Where(x => x.costPerPoint > costPerPoint).ToList() is { Count: > 0 } uList2)
                 {
+                    workersToReplace.Add(uList2[0].worker.WorkerName);
                     indicatorType = Math.Max(indicatorType, 2);
                     var longestWorkerName = uList2.Max(x => x.worker.WorkerName.Length);
                     tooltipActions.Add(() =>
                     {
                         ImGui.Text($"{worker.WorkerName} better at {candidateRankType.Id} ({costPerPoint:F2} gph/work unit, rank {candidateRank}, {worker.WagePerHour} gph) than:");
-                        if (ImGui.BeginTable($"better##{candidateRankType.Id}", 4, ImGuiTableFlags.Borders))
+                        if (ImGui.BeginTable($"better##{candidateRankType.Id}", 5, ImGuiTableFlags.Borders))
                         {
                             ImGui.TableSetupColumn("Name");
                             ImGui.TableSetupColumn(gphPerWorkUnitString);
                             ImGui.TableSetupColumn("Rank");
                             ImGui.TableSetupColumn("GPH");
+                            ImGui.TableSetupColumn("Current job");
                             ImGui.TableHeadersRow();
                             foreach (var (villageWorker, costPerSpeedI) in uList2)
                             {
@@ -350,6 +362,8 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                                 ImGui.Text(villageWorker.JobRanks.GetValueOrDefault(candidateRankType, 0).ToString().PadLeft(4));
                                 ImGui.TableNextColumn();
                                 ImGui.Text(villageWorker.WagePerHour.ToString().PadLeft(4));
+                                ImGui.TableNextColumn();
+                                ImGui.Text(villageWorker.Job.Name switch { "" => $"Index {villageWorker.Job.Discriminator}", var s => s });
                             }
 
                             ImGui.EndTable();
@@ -362,18 +376,20 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                              return oldRank < candidateRank;
                          }).ToList() is { Count: > 0 } uList3)
                 {
+                    workersToReplace.Add(uList3[0].worker.WorkerName);
                     indicatorType = Math.Max(indicatorType, 1);
                     var longestWorkerName = uList3.Max(x => x.worker.WorkerName.Length);
                     tooltipActions.Add(() =>
                     {
                         ImGui.Text(
                             $"{worker.WorkerName} has higher {candidateRankType.Id} rank ({costPerPoint:F2} gph/work unit, rank {candidateRank}, {worker.WagePerHour} gph) than:");
-                        if (ImGui.BeginTable($"higher##{candidateRankType.Id}", 4, ImGuiTableFlags.Borders))
+                        if (ImGui.BeginTable($"higher##{candidateRankType.Id}", 5, ImGuiTableFlags.Borders))
                         {
                             ImGui.TableSetupColumn("Name");
                             ImGui.TableSetupColumn(gphPerWorkUnitString);
                             ImGui.TableSetupColumn("Rank");
                             ImGui.TableSetupColumn("GPH");
+                            ImGui.TableSetupColumn("Current job");
                             ImGui.TableHeadersRow();
                             foreach (var (villageWorker, costPerSpeedI) in uList3)
                             {
@@ -386,6 +402,8 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                                 ImGui.Text(villageWorker.JobRanks.GetValueOrDefault(candidateRankType, 0).ToString().PadLeft(4));
                                 ImGui.TableNextColumn();
                                 ImGui.Text(villageWorker.WagePerHour.ToString().PadLeft(4));
+                                ImGui.TableNextColumn();
+                                ImGui.Text(villageWorker.Job.Name switch { "" => $"Index {villageWorker.Job.Discriminator}", var s => s });
                             }
 
                             ImGui.EndTable();
