@@ -1,6 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices.JavaScript;
 using ExileCore;
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
@@ -10,6 +12,7 @@ using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
 using ImGuiNET;
 using SharpDX;
+using Vector2 = System.Numerics.Vector2;
 
 namespace VillageHelper;
 
@@ -23,6 +26,20 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
         ["Disenchanting"] = 20.66f,
         ["Shipping"] = 7.64f,
         ["Mapping"] = 35.7f,
+    };
+    
+    private static readonly Dictionary<string, float> ResourceValues = new Dictionary<string, float>()
+    {
+        ["Crimson Iron"] = 16f,
+        ["Orichalcum"] = 19f,
+        ["Petrified Amber"] = 24f,
+        ["Bismuth"] = 37f,
+        ["Verisium"] = 64f,
+        ["Wheat"] = 12f,
+        ["Corn"] = 15f,
+        ["Pumpkin"] = 18f,
+        ["Orgourd"] = 21f,
+        ["Blue Zanthimum"] = 24f,
     };
 
     public override bool Initialise()
@@ -267,6 +284,55 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                         Graphics.DrawFrame(workerToReplace.GetClientRectCache, Settings.BadColor, 3);
                     }
                 }
+            }
+        }
+
+
+        // Render Shipment Helper
+        if (GameController.IngameState.IngameUi.VillageShipmentScreen.IsVisible)
+        {
+            Vector2 offset = new Vector2(80, 80);
+            var prepareShipment = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([3, 1, 0]);
+            if (prepareShipment is not null && prepareShipment.IsVisible) offset += new Vector2(prepareShipment.GetClientRect().Size.Width, 0);
+            // Iterate over selected Cities
+            for (int i = 0; i <= 2; i++)
+            {
+                var node = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([3, 0, i]);
+                var cityName = node?.GetChildFromIndices([7, 0, 0])?.Text;
+                if (cityName == null) continue;
+                
+                var displayText = "";
+                // Find Wanted Resources
+                for (int j = 1; j <= 5; j++)
+                {
+                    var targetNode = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([2, 1, j]);
+                    var cityTooltip = targetNode?.Tooltip;
+                    if (cityTooltip == null || cityTooltip.Children[0].Text != cityName) continue;
+                    var resourcesNode = cityTooltip.GetChildFromIndices([3, 0]);
+
+                    for (int k = 0; k < resourcesNode.ChildCount; k++)
+                    {
+                        var resourceNode = resourcesNode.GetChildFromIndices([k]);
+                        var resourceName = resourceNode[1].Text.Trim();
+                        var resourcesNeeded = resourceNode[2].Text.Trim();
+                        var alreadySend = Int32.Parse(new string(resourcesNeeded.TakeWhile(e => e != '/').ToArray()), NumberStyles.AllowThousands);
+                        var wanted = Int32.Parse(new string(resourcesNeeded.SkipWhile(e => e != '/').Skip(1).TakeWhile(e => e != ' ').ToArray()), NumberStyles.AllowThousands);
+                        var namePadded = resourceName.PadRight(15, ' ');
+                        var resourcesPadded = $"{alreadySend} / {wanted}".PadRight(15, ' ');
+                        var bonus = new string(resourcesNeeded.SkipWhile(e => e != '+').Skip(1).TakeWhile(e => e != '%').ToArray());
+                        var bonusMulti = 1f;
+                        if (float.TryParse(bonus, out bonusMulti))
+                        {
+                            bonusMulti = 1 + (bonusMulti / 100f);
+                        };
+                        var value = 1f;
+                        ResourceValues.TryGetValue(resourceName, out value);
+                        var resourcesNeededToFullfill = Math.Ceiling((wanted - alreadySend) / value * bonusMulti) ;
+                        displayText += $"{namePadded} {resourcesPadded} Missing: {resourcesNeededToFullfill}\n";
+                    }
+                }
+                
+                Graphics.DrawTextWithBackground(displayText.Trim(), node.GetClientRect().TopRight.ToVector2Num() + offset, Color.Black);
             }
         }
     }
