@@ -306,9 +306,10 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                     foreach (var portRequest in ports)
                     {
                         var effectiveness = 100 + portRequest.RequestMarkup * (100 + villageScreen.VillageStats.GetValueOrDefault(GameStat.VillagePortQuotaEffectivenessPct)) / 10;
-                        var exportText = portRequest.ResourceType.UpgradedExport != null
-                            ? $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {portRequest.RequestedAmount - portRequest.DeliveredAmount,6} at {effectiveness,3:F0}%"
-                            : $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0),6} at {effectiveness,3:F0}%";
+                        var remainingResources = portRequest.ResourceType.UpgradedExport != null
+                            ? Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0)
+                            : portRequest.RequestedAmount - portRequest.DeliveredAmount;
+                        var exportText = $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {remainingResources,6} at {effectiveness,3:F0}%";
                         var textSize = Graphics.DrawTextWithBackground(
                             exportText,
                             configurationTextPlacement + offset,
@@ -335,9 +336,10 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 foreach (var portRequest in ports)
                 {
                     var effectiveness = 100 + portRequest.RequestMarkup * (100 + villageScreen.VillageStats.GetValueOrDefault(GameStat.VillagePortQuotaEffectivenessPct)) / 10;
-                    var exportText = portRequest.ResourceType.UpgradedExport != null
-                        ? $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {portRequest.RequestedAmount - portRequest.DeliveredAmount,6} at {effectiveness,3:F0}%"
-                        : $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0),6} at {effectiveness,3:F0}%";
+                    var remainingResources = portRequest.ResourceType.UpgradedExport != null
+                        ? Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0)
+                        : portRequest.RequestedAmount - portRequest.DeliveredAmount;
+                    var exportText = $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {remainingResources,6} at {effectiveness,3:F0}%";
                     var textSize = Graphics.DrawTextWithBackground(
                         exportText,
                         portTextPlacement + offset,
