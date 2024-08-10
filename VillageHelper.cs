@@ -27,7 +27,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
         ["Shipping"] = 7.64f,
         ["Mapping"] = 35.7f,
     };
-    
+
     private static readonly Dictionary<string, float> ResourceValues = new Dictionary<string, float>()
     {
         ["Crimson Iron"] = 16f,
@@ -287,52 +287,63 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
             }
         }
 
-
-        // Render Shipment Helper
-        if (GameController.IngameState.IngameUi.VillageShipmentScreen.IsVisible)
+        if (GameController.IngameState.IngameUi.VillageShipmentScreen is { IsVisible: true } villageShipmentScreen)
         {
-            Vector2 offset = new Vector2(80, 80);
-            var prepareShipment = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([3, 1, 0]);
-            if (prepareShipment is not null && prepareShipment.IsVisible) offset += new Vector2(prepareShipment.GetClientRect().Size.Width, 0);
-            // Iterate over selected Cities
-            for (int i = 0; i <= 2; i++)
+            var portRequestList = villageScreen.PortRequests;
+            if (villageShipmentScreen.ShipIsOpened)
             {
-                var node = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([3, 0, i]);
-                var cityName = node?.GetChildFromIndices([7, 0, 0])?.Text;
-                if (cityName == null) continue;
-                
-                var displayText = "";
-                // Find Wanted Resources
-                for (int j = 1; j <= 5; j++)
+                var shipIndex = villageShipmentScreen.OpenedShipIndex;
+                var shipInfo = villageScreen.ShipInfo[shipIndex];
+                var targetPort = shipInfo.TargetPort;
+                var targetPortIndex = GameController.Files.VillageShippingPorts.EntriesList.IndexOf(targetPort);
+                var configurationTextPlacement = villageShipmentScreen.ShipmentConfigurationElement.GetClientRectCache.TopRight.ToVector2Num();
+                if (targetPortIndex > 0 && targetPortIndex <= portRequestList.Count)
                 {
-                    var targetNode = GameController.IngameState.IngameUi.VillageShipmentScreen.GetChildFromIndices([2, 1, j]);
-                    var cityTooltip = targetNode?.Tooltip;
-                    if (cityTooltip == null || cityTooltip.Children[0].Text != cityName) continue;
-                    var resourcesNode = cityTooltip.GetChildFromIndices([3, 0]);
-
-                    for (int k = 0; k < resourcesNode.ChildCount; k++)
+                    var portRequests = portRequestList[targetPortIndex - 1].Requests;
+                    var offset = new Vector2(0, 0);
+                    var ports = portRequests.Where(x => x.DeliveredAmount < x.RequestedAmount).ToList();
+                    var maxNameLength = ports.Max(x => x.ResourceType.Name.Length);
+                    foreach (var portRequest in ports)
                     {
-                        var resourceNode = resourcesNode.GetChildFromIndices([k]);
-                        var resourceName = resourceNode[1].Text.Trim();
-                        var resourcesNeeded = resourceNode[2].Text.Trim();
-                        var alreadySend = Int32.Parse(new string(resourcesNeeded.TakeWhile(e => e != '/').ToArray()), NumberStyles.AllowThousands);
-                        var wanted = Int32.Parse(new string(resourcesNeeded.SkipWhile(e => e != '/').Skip(1).TakeWhile(e => e != ' ').ToArray()), NumberStyles.AllowThousands);
-                        var namePadded = resourceName.PadRight(15, ' ');
-                        var resourcesPadded = $"{alreadySend} / {wanted}".PadRight(15, ' ');
-                        var bonus = new string(resourcesNeeded.SkipWhile(e => e != '+').Skip(1).TakeWhile(e => e != '%').ToArray());
-                        var bonusMulti = 1f;
-                        if (float.TryParse(bonus, out bonusMulti))
-                        {
-                            bonusMulti = 1 + (bonusMulti / 100f);
-                        };
-                        var value = 1f;
-                        ResourceValues.TryGetValue(resourceName, out value);
-                        var resourcesNeededToFullfill = Math.Ceiling((wanted - alreadySend) / value * bonusMulti) ;
-                        displayText += $"{namePadded} {resourcesPadded} Missing: {resourcesNeededToFullfill}\n";
+                        var effectiveness = 100 + portRequest.RequestMarkup * (100 + villageScreen.VillageStats.GetValueOrDefault(GameStat.VillagePortQuotaEffectivenessPct)) / 10;
+                        var exportText = portRequest.ResourceType.UpgradedExport != null
+                            ? $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {portRequest.RequestedAmount - portRequest.DeliveredAmount,6} at {effectiveness,3:F0}%"
+                            : $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0),6} at {effectiveness,3:F0}%";
+                        var textSize = Graphics.DrawTextWithBackground(
+                            exportText,
+                            configurationTextPlacement + offset,
+                            Color.Black);
+                        offset.Y += textSize.Y;
                     }
                 }
-                
-                Graphics.DrawTextWithBackground(displayText.Trim(), node.GetClientRect().TopRight.ToVector2Num() + offset, Color.Black);
+                else if (targetPortIndex == 0)
+                {
+                    Graphics.DrawTextWithBackground(
+                        "No port selected...",
+                        configurationTextPlacement,
+                        Color.Black);
+                }
+            }
+
+            foreach (var (portIndex, portElement) in villageShipmentScreen.PortElementsByIndex)
+            {
+                var portRequests = portRequestList[portIndex - 1].Requests;
+                var offset = new Vector2(0, 0);
+                var portTextPlacement = portElement.GetClientRectCache.TopRight.ToVector2Num();
+                var ports = portRequests.Where(x => x.DeliveredAmount < x.RequestedAmount).ToList();
+                var maxNameLength = ports.Max(x => x.ResourceType.Name.Length);
+                foreach (var portRequest in ports)
+                {
+                    var effectiveness = 100 + portRequest.RequestMarkup * (100 + villageScreen.VillageStats.GetValueOrDefault(GameStat.VillagePortQuotaEffectivenessPct)) / 10;
+                    var exportText = portRequest.ResourceType.UpgradedExport != null
+                        ? $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {portRequest.RequestedAmount - portRequest.DeliveredAmount,6} at {effectiveness,3:F0}%"
+                        : $"{portRequest.ResourceType.Name.PadRight(maxNameLength)}: {Math.Ceiling((portRequest.RequestedAmount - portRequest.DeliveredAmount) / 5.0),6} at {effectiveness,3:F0}%";
+                    var textSize = Graphics.DrawTextWithBackground(
+                        exportText,
+                        portTextPlacement + offset,
+                        Color.Black);
+                    offset.Y += textSize.Y;
+                }
             }
         }
     }
