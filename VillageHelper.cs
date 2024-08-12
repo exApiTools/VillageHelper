@@ -8,6 +8,7 @@ using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
 using ExileCore.PoEMemory.Elements.Village;
 using ExileCore.PoEMemory.FilesInMemory.Village;
+using ExileCore.Shared.Cache;
 using ExileCore.Shared.Enums;
 using ExileCore.Shared.Helpers;
 using ImGuiNET;
@@ -28,19 +29,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
         ["Mapping"] = 35.7f,
     };
 
-    private static readonly Dictionary<string, float> ResourceValues = new Dictionary<string, float>()
-    {
-        ["Crimson Iron"] = 16f,
-        ["Orichalcum"] = 19f,
-        ["Petrified Amber"] = 24f,
-        ["Bismuth"] = 37f,
-        ["Verisium"] = 64f,
-        ["Wheat"] = 12f,
-        ["Corn"] = 15f,
-        ["Pumpkin"] = 18f,
-        ["Orgourd"] = 21f,
-        ["Blue Zanthimum"] = 24f,
-    };
+    private TimeCache<List<DrawItem>> _overlayCache;
 
     public override bool Initialise()
     {
@@ -62,6 +51,14 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
 
             ImGui.SetClipboardText(text);
         };
+
+        _overlayCache = new TimeCache<List<DrawItem>>(() =>
+        {
+            var villageScreen = GameController.IngameState.IngameUi.VillageScreen;
+            return ComputeStatusOverlayDrawItems(villageScreen,
+                Settings.ShowProjectedCurrentGold ? villageScreen.CurrentGold : villageScreen.ZoneLoadResources.Gold);
+        }, (long)(Settings.StatusOverlayUpdatePeriod.Value * 1000));
+        Settings.StatusOverlayUpdatePeriod.OnValueChanged += (sender, f) => _overlayCache.NewTime((long)(f * 1000));
         return true;
     }
 
@@ -83,11 +80,11 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
 
         var villageScreen = GameController.IngameState.IngameUi.VillageScreen;
         var zoneLoadResources = villageScreen.ZoneLoadResources;
-        var villageGold = Settings.ShowProjectedCurrentGold ? villageScreen.CurrentGold : zoneLoadResources.Gold;
         if (Settings.WindowShown &&
             zoneLoadResources.Resources is { Count: > 0 } resources &&
             ImGui.Begin("Village stats"))
         {
+            var villageGold = Settings.ShowProjectedCurrentGold ? villageScreen.CurrentGold : zoneLoadResources.Gold;
             if (Settings.ShowUpgrades &&
                 ImGui.TreeNodeEx("Upgrades", ImGuiTreeNodeFlags.DefaultOpen))
             {
@@ -187,50 +184,7 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
 
         if (Settings.ShowStatusOverlay)
         {
-            var position = GameController.LeftPanel.StartDrawPointNum;
-            var shipmentTextSize = new[]
-            {
-                Graphics.MeasureText("SHIPMENT 00:00!"),
-                Graphics.MeasureText("DISENCHANTMENT EMPTY!"),
-                Graphics.MeasureText("99999 gold (-99999/hr) 00:00"),
-            }.MaxBy(x => x.X);
-            var positionLeft = position - shipmentTextSize with { Y = 0 };
-            positionLeft.X += Settings.StatusOverlayXOffset;
-            positionLeft.Y += Settings.StatusOverlayYOffset;
-
-            if (Settings.ShowActions)
-            {
-                if (villageScreen.RemainingShipmentTimes is { Count: > 0 })
-                {
-                    foreach (var remainingShipmentTime in villageScreen.RemainingShipmentTimes)
-                    {
-                        var drawText = remainingShipmentTime <= TimeSpan.Zero
-                            ? Graphics.DrawTextWithBackground("SHIPMENT HERE!", positionLeft, Settings.GoodColor, Color.Black)
-                            : Graphics.DrawTextWithBackground($"Shipment {remainingShipmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor, Color.Black);
-                        position.Y += drawText.Y;
-                        positionLeft.Y += drawText.Y;
-                    }
-                }
-
-                var textSize = villageScreen.RemainingDisenchantmentTime <= TimeSpan.Zero
-                    ? Graphics.DrawTextWithBackground("DISENCHANTMENT EMPTY!", positionLeft, Settings.BadColor, Color.Black)
-                    : Graphics.DrawTextWithBackground($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", positionLeft, Settings.NeutralColor, Color.Black);
-                position.Y += textSize.Y;
-                positionLeft.Y += textSize.Y;
-            }
-
-            if (Settings.ShowResources)
-            {
-                var colorSet = villageGold <= 1 && Settings.ShowEmptyResourcesInColor;
-                var textSize = Graphics.DrawTextWithBackground(
-                    $"{villageGold} gold (-{villageScreen.TotalWagePerHour}/hr) {TimeSpan.FromHours(villageGold / (float)villageScreen.TotalWagePerHour):hh\\:mm}", positionLeft,
-                    colorSet ? Settings.BadColor : Settings.NeutralColor, Color.Black);
-
-                position.Y += textSize.Y;
-                positionLeft.Y += textSize.Y;
-            }
-
-            GameController.LeftPanel.StartDrawPointNum = position;
+            ShowStatusOverlay();
         }
 
         if (Settings.ShowWorkerUpgradeTips)
@@ -348,6 +302,68 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 }
             }
         }
+    }
+
+    private record DrawItem(string Text, Color Color, Color BackgroundColor);
+
+    private List<DrawItem> ComputeStatusOverlayDrawItems(VillageScreen villageScreen, int villageGold)
+    {
+        var result = new List<DrawItem>();
+
+        if (Settings.ShowActions)
+        {
+            if (villageScreen.RemainingShipmentTimes is { Count: > 0 })
+            {
+                foreach (var remainingShipmentTime in villageScreen.RemainingShipmentTimes)
+                {
+                    result.Add(
+                        remainingShipmentTime <= TimeSpan.Zero
+                            ? new DrawItem("SHIPMENT HERE!", Settings.GoodColor, Color.Black)
+                            : new DrawItem($"Shipment {remainingShipmentTime:hh\\:mm}", Settings.NeutralColor, Color.Black)
+                    );
+                }
+            }
+
+            result.Add(
+                villageScreen.RemainingDisenchantmentTime <= TimeSpan.Zero
+                    ? new DrawItem("DISENCHANTMENT EMPTY!", Settings.BadColor, Color.Black)
+                    : new DrawItem($"Disenchantment {villageScreen.RemainingDisenchantmentTime:hh\\:mm}", Settings.NeutralColor, Color.Black)
+            );
+        }
+
+        if (Settings.ShowResources)
+        {
+            var colorSet = villageGold <= 1 && Settings.ShowEmptyResourcesInColor;
+            result.Add(
+                new DrawItem(
+                    $"{villageGold} gold (-{villageScreen.TotalWagePerHour}/hr) {TimeSpan.FromHours(villageGold / (float)villageScreen.TotalWagePerHour):hh\\:mm}",
+                    colorSet ? Settings.BadColor : Settings.NeutralColor, Color.Black)
+            );
+        }
+
+        return result;
+    }
+
+    private void ShowStatusOverlay()
+    {
+        var position = GameController.LeftPanel.StartDrawPointNum;
+        var shipmentTextSize = new[]
+        {
+            Graphics.MeasureText("SHIPMENT 00:00!"),
+            Graphics.MeasureText("DISENCHANTMENT EMPTY!"),
+            Graphics.MeasureText("99999 gold (-99999/hr) 00:00"),
+        }.MaxBy(x => x.X);
+        var positionLeft = position - shipmentTextSize with { Y = 0 };
+        positionLeft.X += Settings.StatusOverlayXOffset;
+        positionLeft.Y += Settings.StatusOverlayYOffset;
+        foreach (var drawItem in _overlayCache.Value)
+        {
+            var drawText = Graphics.DrawTextWithBackground(drawItem.Text, positionLeft, drawItem.Color, drawItem.BackgroundColor);
+            position.Y += drawText.Y;
+            positionLeft.Y += drawText.Y;
+        }
+
+        GameController.LeftPanel.StartDrawPointNum = position;
     }
 
     private void ShowUpgradeTooltips(Dictionary<VillageJobType, List<VillageWorker>> existingWorkersByAssignedSkill, BaseVillageWorker worker, Element workerElement,
