@@ -18,10 +18,13 @@ public class VillageHelperSettings : ISettings
     public ToggleNode ShowEmptyResources { get; set; } = new ToggleNode(true);
     public ToggleNode ShowEmptyResourcesInColor { get; set; } = new ToggleNode(true);
     public ToggleNode ShowStatusOverlay { get; set; } = new ToggleNode(true);
+    public ToggleNode ShowAverageMapCompletionPercent { get; set; } = new ToggleNode(true);
+    public ToggleNode ShowMapperDeathChance { get; set; } = new ToggleNode(true);
     public RangeNode<int> StatusOverlayXOffset { get; set; } = new RangeNode<int>(0, 0, 200);
     public RangeNode<int> StatusOverlayYOffset { get; set; } = new RangeNode<int>(0, 0, 200);
     public RangeNode<float> StatusOverlayUpdatePeriod { get; set; } = new(1, 0, 10);
     public ToggleNode ShowProjectedCurrentGold { get; set; } = new ToggleNode(false);
+
 
     public ToggleNode ShowWorkerUpgradeTips { get; set; } = new ToggleNode(true);
     public ColorNode GoodColor { get; set; } = new ColorNode(Color.Green);
