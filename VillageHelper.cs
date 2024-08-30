@@ -368,11 +368,11 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                             var chanceToDieText = $"{chanceToDie}%";
                             var chanceToDieTextSize = Graphics.MeasureText(chanceToDieText);
                             var chanceToDieTextPlacement = map.GetClientRectCache.TopRight.ToVector2Num();                        
-                            chanceToDieTextPlacement.X -= (chanceToDieTextSize.X/2 + map.GetClientRectCache.Width/2);
+                            chanceToDieTextPlacement.X -= map.GetClientRectCache.Width/2;
                             chanceToDieTextPlacement.Y -= 25;
 
                             // Draw the chance to die
-                            Graphics.DrawTextWithBackground(chanceToDieText, chanceToDieTextPlacement, chanceColor, Color.Black);
+                            Graphics.DrawTextWithBackground(chanceToDieText, chanceToDieTextPlacement, chanceColor, FontAlign.Center, Color.Black);
                         }
                     }
 
@@ -396,15 +396,15 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                             // Calculate the color based on the average chance to complete
                             var completionColor = averageChance switch
                             {
-                                < 65 => Settings.BadColor,
-                                < 85 => Settings.NeutralColor,
+                                < 45 => Settings.BadColor,
+                                < 65 => Settings.NeutralColor,
                                 _ => Settings.GoodColor
                             };
                             
                             var chanceToCompleteText = $"{averageChance}%";
                             var chanceToCompleteTextSize = Graphics.MeasureText(chanceToCompleteText);
                             var chanceToCompleteTextPlacement = map.GetClientRectCache.BottomRight.ToVector2Num();
-                            chanceToCompleteTextPlacement.X -= chanceToCompleteTextSize.X;///2 + map.GetClientRectCache.Width/2);
+                            chanceToCompleteTextPlacement.X -= map.GetClientRectCache.Width/2;
                             chanceToCompleteTextPlacement.Y += 5;
 
                             // Draw the average chance to complete
