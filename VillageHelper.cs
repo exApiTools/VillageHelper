@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices.JavaScript;
+using System.Text.RegularExpressions;
 using ExileCore;
 using ExileCore.PoEMemory;
 using ExileCore.PoEMemory.Components;
@@ -302,10 +304,118 @@ public class VillageHelper : BaseSettingsPlugin<VillageHelperSettings>
                 }
             }
         }
+
+        if (Settings.ShowAverageMapCompletionPercent || Settings.ShowMapperDeathChance)
+        {
+
+
+            if (GameController.IngameState.IngameUi.GetChildAtIndex(124) is
+                {
+                    IsVisible: true
+                })
+            {
+                ShowMapOverlay(GameController.IngameState.IngameUi.GetChildAtIndex(124));
+            }
+        }
     }
 
     private record DrawItem(string Text, Color Color, Color BackgroundColor);
 
+    private void ShowMapOverlay(Element MapperScreen)
+    {
+        // Get the map "inventory" from the mapper screen
+        var Maps = MapperScreen.GetChildAtIndex(4)?.GetChildrenAs<Element>().Skip(1).ToList();
+
+        // Iterate over each map
+        foreach(var map in Maps)
+        {
+        
+            // Check if the map is visible and has a valid size
+            if (map is { IsVisible: true } && map.GetClientRectCache.Width > 0 && map.GetClientRectCache.Height > 0)
+                {
+                    var tooltipText = map.Tooltip.GetChildAtIndex(1)?.TextNoTags;
+                    
+                    // Check if the map has a tooltip
+                    if (tooltipText == null)
+                    {
+                        continue;
+                    }
+                    
+                    string chanceToDie = "";
+                    string chanceToCompleteMin = "";
+                    string chanceToCompleteMax = "";
+                    Match match;
+
+                    if (Settings.ShowMapperDeathChance)
+                    {
+                        match = Regex.Match(tooltipText, @"(\d+)% chance for an Atlas Runner to be permanently killed in this Map");
+
+                        if (match.Success)
+                        {
+                            chanceToDie = match.Groups[1].Value;                            
+                        }
+
+                        // If no chance to die, skip
+                        if (chanceToDie != "")
+                        {
+                            // Calculate the color based on the chance to die
+                            var chanceColor = int.Parse(chanceToDie) switch
+                            {
+                                < 2 => Settings.GoodColor,
+                                < 5 => Settings.NeutralColor,
+                                _ => Settings.BadColor
+                            };
+                            var chanceToDieText = $"{chanceToDie}%";
+                            var chanceToDieTextSize = Graphics.MeasureText(chanceToDieText);
+                            var chanceToDieTextPlacement = map.GetClientRectCache.TopRight.ToVector2Num();                        
+                            chanceToDieTextPlacement.X -= (chanceToDieTextSize.X/2 + map.GetClientRectCache.Width/2);
+                            chanceToDieTextPlacement.Y -= 25;
+
+                            // Draw the chance to die
+                            Graphics.DrawTextWithBackground(chanceToDieText, chanceToDieTextPlacement, chanceColor, Color.Black);
+                        }
+                    }
+
+                    // Check if the map has a chance to complete
+                    if (Settings.ShowAverageMapCompletionPercent)
+                    {
+                        
+                        match = Regex.Match(tooltipText, @"Expected Map Completion: (\d+)-(\d+)%");
+                        if (match.Success)
+                        {
+                            chanceToCompleteMin = match.Groups[1].Value;
+                            chanceToCompleteMax = match.Groups[2].Value;                            
+                        }
+
+                        // If no chance to complete, skip
+                        if (chanceToCompleteMin != "" && chanceToCompleteMax != "")
+                        {
+                            // Calculate the average chance to complete
+                            var averageChance = (int.Parse(chanceToCompleteMin) + int.Parse(chanceToCompleteMax))/2;
+                            
+                            // Calculate the color based on the average chance to complete
+                            var completionColor = averageChance switch
+                            {
+                                < 65 => Settings.BadColor,
+                                < 85 => Settings.NeutralColor,
+                                _ => Settings.GoodColor
+                            };
+                            
+                            var chanceToCompleteText = $"{averageChance}%";
+                            var chanceToCompleteTextSize = Graphics.MeasureText(chanceToCompleteText);
+                            var chanceToCompleteTextPlacement = map.GetClientRectCache.BottomRight.ToVector2Num();
+                            chanceToCompleteTextPlacement.X -= chanceToCompleteTextSize.X;///2 + map.GetClientRectCache.Width/2);
+                            chanceToCompleteTextPlacement.Y += 5;
+
+                            // Draw the average chance to complete
+                            Graphics.DrawTextWithBackground(chanceToCompleteText, chanceToCompleteTextPlacement, completionColor, FontAlign.Center, Color.Black);
+                        }
+                    }
+                }
+            
+   
+        }
+    }
     private List<DrawItem> ComputeStatusOverlayDrawItems(VillageScreen villageScreen, int villageGold)
     {
         var result = new List<DrawItem>();
